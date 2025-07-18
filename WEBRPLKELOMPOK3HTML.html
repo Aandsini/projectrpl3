@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BubbleTea Paradise - Pemesanan & Pembayaran</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <style>
+        .menu-item, .payment-method {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .menu-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .payment-method:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .payment-method.active {
+            border-color: #3B82F6;
+            background-color: #71e0d2;
+        }
+        .btn-click:active {
+            transform: scale(0.95);
+        }
+        .animate-popup {
+            animation: popup 0.4s ease-out forwards;
+        }
+        @keyframes popup {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        #payment-qrcode {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-mug-hot text-2xl"></i>
+                <h1 class="text-2xl font-bold">BubbleTea Paradise</h1>
+            </div>
+            <div class="relative">
+                <button id="cart-btn" class="relative p-2 rounded-full hover:bg-pink-700 transition btn-click">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                    <span id="cart-count" class="absolute -top-1 -right-1 bg-yellow-400 text-black rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">0</span>
+                </button>
+                <div id="cart-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl p-4 z-50">
+                    <h3 class="font-bold text-gray-800 mb-2">Keranjang Anda</h3>
+                    <div id="cart-items" class="max-h-60 overflow-y-auto space-y-2"></div>
+                    <div class="border-t border-gray-200 mt-2 pt-2">
+                        <p class="flex justify-between font-semibold">
+                            <span>Total:</span>
+                            <span id="cart-total">Rp 0</span>
+                        </p>
+                        <button id="checkout-btn" class="w-full mt-2 bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 transition btn-click flex items-center justify-center">
+                            <i class="fas fa-credit-card mr-2"></i> Checkout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Menu Section -->
+    <section class="container mx-auto px-4 py-12">
+        <h2 class="text-3xl font-bold text-center mb-8 text-gray-800">Menu Minuman Kami</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="menu-container"></div>
+    </section>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-md animate-popup" style="max-height: 90vh; overflow-y: auto;">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Form Pemesanan</h3>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-700 btn-click">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="order-form">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 mb-2" for="name">Nama Lengkap*</label>
+                        <input type="text" id="name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 mb-2" for="phone">Nomor Telepon*</label>
+                        <input type="tel" id="phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 mb-2" for="address">Meja No*</label>
+                        <textarea id="address" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500" required></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 mb-2" for="notes">Catatan (Opsional)</label>
+                        <textarea id="notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"></textarea>
+                    </div>
+                    
+                    <!-- Metode Pembayaran -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-3">Pilih Metode Pembayaran</h3>
+                        
+                        <div class="space-y-3">
+                            <!-- Bank Transfer -->
+                            <div class="payment-method border rounded-lg p-4" onclick="selectPayment('bank')">
+                                <div class="flex items-center">
+                                    <input type="radio" name="payment" id="bank" class="mr-3" checked>
+                                    <div>
+                                        <label for="bank" class="font-medium text-gray-800">Bank Transfer</label>
+                                        <p class="text-sm text-gray-500 mt-1">Transfer manual ke rekening bank</p>
+                                    </div>
+                                </div>
+                                
+                                <div id="bank-details" class="mt-4 space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Bank BCA</span>
+                                        <span class="font-medium">1234567890</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Bank BRI</span>
+                                        <span class="font-medium">9876543210</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2">Harap transfer sesuai total pembayaran</p>
+                                </div>
+                            </div>
+                            
+                            <!-- E-Wallet -->
+                            <div class="payment-method border rounded-lg p-4" onclick="selectPayment('ewallet')">
+                                <div class="flex items-center">
+                                    <input type="radio" name="payment" id="ewallet" class="mr-3">
+                                    <div>
+                                        <label for="ewallet" class="font-medium text-gray-800">E-Wallet</label>
+                                        <p class="text-sm text-gray-500 mt-1">DANA, OVO, LinkAja, dll</p>
+                                    </div>
+                                </div>
+                                
+                                <div id="ewallet-details" class="hidden mt-4 space-y-4">
+                                    <div class="flex items-center space-x-3">
+                                        <input type="radio" name="ewallet" id="dana">
+                                        <label for="dana" class="flex items-center">
+                                            <i class="fab fa-cc-diners-club text-blue-500 text-xl mr-2"></i>
+                                            DANA
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center space-x-3">
+                                        <input type="radio" name="ewallet" id="ovo">
+                                        <label for="ovo" class="flex items-center">
+                                            <i class="fab fa-cc-mastercard text-purple-500 text-xl mr-2"></i>
+                                            OVO
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- QRIS -->
+                            <div class="payment-method border rounded-lg p-4" onclick="selectPayment('qris')">
+                                <div class="flex items-center">
+                                    <input type="radio" name="payment" id="qris" class="mr-3">
+                                    <div>
+                                        <label for="qris" class="font-medium text-gray-800">QRIS</label>
+                                        <p class="text-sm text-gray-500 mt-1">Scan QR code untuk pembayaran</p>
+                                    </div>
+                                </div>
+                                
+                                <div id="qris-details" class="hidden mt-4 text-center">
+                                    <div id="payment-qrcode" class="mb-3"></div>
+                                    <p class="text-xs text-gray-500">Scan QR code di atas</p>
+                                </div>
+                            </div>
+                            
+                            <!-- COD -->
+                            <div class="payment-method border rounded-lg p-4" onclick="selectPayment('cod')">
+                                <div class="flex items-center">
+                                    <input type="radio" name="payment" id="cod" class="mr-3">
+                                    <div>
+                                        <label for="cod" class="font-medium text-gray-800">Bayar di Tempat</label>
+                                        <p class="text-sm text-gray-500 mt-1">Bayar saat pesanan diterima</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="order-summary" class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <h4 class="font-bold mb-2">Ringkasan Pesanan</h4>
+                        <div id="modal-cart-items"></div>
+                        <div class="flex justify-between font-semibold mt-2 pt-2 border-t border-gray-200">
+                            <span>Total:</span>
+                            <span id="modal-total">Rp 0</span>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-pink-600 text-white py-3 rounded-lg hover:bg-pink-700 transition font-semibold btn-click flex items-center justify-center">
+                        <i class="fas fa-paper-plane mr-2"></i> Proses Pembayaran
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Success Modal -->
+    <div id="success-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-md p-6 text-center animate-popup">
+            <div class="text-green-500 text-5xl mb-4">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">Pesanan Berhasil!</h3>
+            <div id="order-details" class="text-left mb-4 bg-gray-50 p-3 rounded-lg"></div>
+            <p class="text-gray-600 mb-4">Kami telah mengirim detail pesanan ke nomor WhatsApp Anda.</p>
+            <button id="close-success-modal" class="w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 transition font-semibold btn-click">Tutup</button>
+        </div>
+    </div>
+
+    <script>
+        // Data Menu
+        const menuItems = [
+            {
+                name: "Original Bubble Tea",
+                price: 25000,
+                image: "https://tse3.mm.bing.net/th?id=OIP.DT4Wtbr4yNy_5WajTbUHXgHaJX&pid=Api&P=0&h=180",
+                description: "Teh susu dengan bubble kenyal, rasa original yang nikmat",
+                bestseller: true
+            },
+            {
+                name: "Matcha Latte",
+                price: 30000,
+                image: "https://img.freepik.com/premium-photo/iced-matcha-latte-isolated-white-background_881868-3868.jpg?w=2000",
+                description: "Matcha premium dengan susu segar, rasa lembut dan menyegarkan"
+            },
+            {
+                name: "Taro Milk",
+                price: 28000,
+                image: "https://tse2.mm.bing.net/th?id=OIP.8B1uXZfPxW0Muiojg4tioQHaHa&pid=Api&P=0&h=180",
+                description: "Minuman dengan rasa talas ungu yang unik dan creamy"
+            },
+            {
+                name: "Strawberry Smoothie",
+                price: 32000,
+                image: "https://life-in-the-lofthouse.com/wp-content/uploads/2020/05/Best-Strawberry-Smoothie-1041x1536.jpg",
+                description: "Smoothie stroberi segar dengan yogurt"
+            },
+            {
+                name: "Coffee Latte",
+                price: 27000,
+                image: "https://tse2.mm.bing.net/th?id=OIP.G4iwWHVLSC_2XIWyRUDz5wHaHa&pid=Api&P=0&h=180",
+                description: "Kopi premium dengan susu steamed yang creamy"
+            },
+            {
+                name: "Avocado Juice",
+                price: 29000,
+                image: "https://static.vecteezy.com/system/resources/thumbnails/041/289/639/small_2x/ai-generated-fresh-avocado-juice-isolated-on-transparent-background-png.png",
+                description: "Jus alpukat segar dengan susu kental manis"
+            }
+        ];
+
+        // Shopping Cart
+        let cart = [];
+        let selectedPaymentMethod = 'bank';
+
+        // DOM Elements
+        const menuContainer = document.getElementById('menu-container');
+        const cartBtn = document.getElementById('cart-btn');
+        const cartDropdown = document.getElementById('cart-dropdown');
+        const cartCount = document.getElementById('cart-count');
+        const cartItems = document.getElementById('cart-items');
+        const cartTotal = document.getElementById('cart-total');
+        const checkoutBtn = document.getElementById('checkout-btn');
+        const checkoutModal = document.getElementById('checkout-modal');
+        const closeModal = document.getElementById('close-modal');
+        const orderForm = document.getElementById('order-form');
+        const modalCartItems = document.getElementById('modal-cart-items');
+        const modalTotal = document.getElementById('modal-total');
+        const successModal = document.getElementById('success-modal');
+        const orderDetails = document.getElementById('order-details');
+        const closeSuccessModal = document.getElementById('close-success-modal');
+
+        // Generate Menu
+        function renderMenu() {
+            menuContainer.innerHTML = '';
+            menuItems.forEach(item => {
+                const menuItem = document.createElement('div');
+                menuItem.className = 'menu-item bg-white rounded-xl overflow-hidden shadow-md';
+                menuItem.innerHTML = `
+                    <div class="relative">
+                        <img src="${item.image}" alt="${item.name}" class="w-full h-48 object-cover">
+                        ${item.bestseller ? '<div class="absolute top-2 right-2 bg-pink-600 text-white text-xs font-bold px-2 py-1 rounded">Terlaris</div>' : ''}
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-2">${item.name}</h3>
+                        <p class="text-gray-600 mb-4">${item.description}</p>
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-pink-600">Rp ${item.price.toLocaleString('id-ID')}</span>
+                            <button class="add-to-cart bg-pink-600 text-white px-4 py-2 rounded-full hover:bg-pink-700 transition btn-click" 
+                                    data-name="${item.name}" 
+                                    data-price="${item.price}">
+                                <i class="fas fa-plus"></i> Tambah
+                            </button>
+                        </div>
+                    </div>
+                `;
+                menuContainer.appendChild(menuItem);
+            });
+
+            // Add event listeners to all add-to-cart buttons
+            document.querySelectorAll('.add-to-cart').forEach(button => {
+                button.addEventListener('click', addToCart);
+            });
+        }
+
+        // Add to Cart
+        function addToCart(e) {
+            const button = e.target.closest('button');
+            const name = button.dataset.name;
+            const price = parseInt(button.dataset.price);
+            
+            // Animation feedback
+            button.classList.add('animate-bounce', 'transform');
+            setTimeout(() => {
+                button.classList.remove('animate-bounce');
+            }, 500);
+
+            // Add item to cart or increase quantity if already exists
+            const existingItem = cart.find(item => item.name === name);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({
+                    name,
+                    price,
+                    quantity: 1
+                });
+            }
+
+            updateCart();
+        }
+
+        // Update Cart
+        function updateCart() {
+            // Update cart count
+            const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
+            cartCount.textContent = totalItems;
+
+            // Update cart dropdown
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p class="text-gray-500 text-sm">Keranjang kosong</p>';
+                cartTotal.textContent = 'Rp 0';
+                checkoutBtn.disabled = true;
+            } else {
+                cartItems.innerHTML = '';
+                let total = 0;
+                
+                cart.forEach(item => {
+                    total += item.price * item.quantity;
+                    
+                    const cartItem = document.createElement('div');
+                    cartItem.className = 'cart-item flex justify-between items-center p-2 bg-gray-50 rounded';
+                    cartItem.innerHTML = `
+                        <div>
+                            <p class="font-semibold">${item.name}</p>
+                            <p class="text-sm text-gray-600">Rp ${item.price.toLocaleString('id-ID')} x ${item.quantity}</p>
+                        </div>
+                        <p class="font-semibold">Rp ${(item.price * item.quantity).toLocaleString('id-ID')}</p>
+                    `;
+                    cartItems.appendChild(cartItem);
+                });
+
+                cartTotal.textContent = `Rp ${total.toLocaleString('id-ID')}`;
+                checkoutBtn.disabled = false;
+            }
+        }
+
+        // Toggle Cart
+        cartBtn.addEventListener('click', () => {
+            cartDropdown.classList.toggle('hidden');
+        });
+
+        // Open Checkout Modal
+        checkoutBtn.addEventListener('click', () => {
+            cartDropdown.classList.add('hidden');
+            checkoutModal.classList.remove('hidden');
+            
+            // Update modal cart items
+            updateModalCart();
+        });
+
+        // Update Modal Cart
+        function updateModalCart() {
+            modalCartItems.innerHTML = '';
+            let total = 0;
+            
+            cart.forEach(item => {
+                total += item.price * item.quantity;
+                
+                const itemElement = document.createElement('div');
+                itemElement.className = 'flex justify-between py-2 border-b border-gray-200';
+                itemElement.innerHTML = `
+                    <div>
+                        <p>${item.name} x ${item.quantity}</p>
+                    </div>
+                    <p class="font-semibold">Rp ${(item.price * item.quantity).toLocaleString('id-ID')}</p>
+                `;
+                modalCartItems.appendChild(itemElement);
+            });
+            
+            modalTotal.textContent = `Rp ${total.toLocaleString('id-ID')}`;
+        }
+
+        // Select Payment Method
+        function selectPayment(method) {
+            selectedPaymentMethod = method;
+            
+            // Reset all payment methods
+            document.querySelectorAll('.payment-method').forEach(item => {
+                item.classList.remove('active');
+                item.querySelector('input[type="radio"]').checked = false;
+            });
+            
+            // Hide all details
+            document.getElementById('bank-details').classList.add('hidden');
+            document.getElementById('ewallet-details').classList.add('hidden');
+            document.getElementById('qris-details').classList.add('hidden');
+            
+            // Activate selected method
+            const selectedMethod = document.getElementById(method);
+            selectedMethod.checked = true;
+            selectedMethod.closest('.payment-method').classList.add('active');
+            
+            // Show details based on method
+            if (method === 'bank') {
+                document.getElementById('bank-details').classList.remove('hidden');
+            } else if (method === 'ewallet') {
+                document.getElementById('ewallet-details').classList.remove('hidden');
+            } else if (method === 'qris') {
+                document.getElementById('qris-details').classList.remove('hidden');
+                generateQRCode();
+            }
+        }
+
+        // Generate QR Code
+        function generateQRCode() {
+            const totalAmount = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+            const customerName = document.getElementById('name').value || 'Pelanggan';
+            
+            // Clear previous QR code
+            document.getElementById('payment-qrcode').innerHTML = '';
+            
+            // Generate new QR code
+            new QRCode(document.getElementById('payment-qrcode'), {
+                text: `Pembayaran BubbleTea Paradise\n\nNama: ${customerName}\nTotal: Rp${totalAmount.toLocaleString('id-ID')}\n\nBank: BCA - 1234567890`,
+                width: 180,
+                height: 180,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        // Close Modal
+        closeModal.addEventListener('click', () => {
+            checkoutModal.classList.add('hidden');
+        });
+
+        // Close Success Modal
+        closeSuccessModal.addEventListener('click', () => {
+            successModal.classList.add('hidden');
+        });
+
+        // Form Submission
+        orderForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Create order summary
+            const orderId = 'ORD-' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+            const customerName = document.getElementById('name').value;
+            const totalAmount = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+            
+            // Show order details
+            orderDetails.innerHTML = `
+                <p><span class="font-semibold">ID Pesanan:</span> ${orderId}</p>
+                <p><span class="font-semibold">Nama:</span> ${customerName}</p>
+                <p><span class="font-semibold">Metode Pembayaran:</span> ${document.querySelector('input[name="payment"]:checked').nextElementSibling.textContent}</p>
+                <p><span class="font-semibold">Total Pembayaran:</span> Rp ${totalAmount.toLocaleString('id-ID')}</p>
+                <p><span class="font-semibold">Status:</span> <span class="text-green-600">Menunggu Pembayaran</span></p>
+            `;
+            
+            // Show success modal
+            checkoutModal.classList.add('hidden');
+            successModal.classList.remove('hidden');
+            
+            // Reset cart
+            cart = [];
+            updateCart();
+        });
+
+        // Initialize
+        renderMenu();
+        updateCart();
+
+        // Click animation for all buttons with btn-click class
+        document.querySelectorAll('.btn-click').forEach(button => {
+            button.addEventListener('mousedown', () => {
+                button.classList.add('scale-95');
+            });
+            button.addEventListener('mouseup', () => {
+                button.classList.remove('scale-95');
+            });
+            button.addEventListener('mouseleave', () => {
+                button.classList.remove('scale-95');
+            });
+        });
+    </script>
+</body>
+</html>
